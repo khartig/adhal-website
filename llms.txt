@@ -1,0 +1,32 @@
+# adhal
+
+> adhal is an open-source, one-shot, peer-to-peer file drop between two devices. The receiver shows a five-word code (or QR), the sender types it, and the file travels directly between the two machines over the Holepunch DHT, end-to-end encrypted. No server stores the file and no account is needed.
+
+- Install: `npm install --global @ad-hal/cli` (Node.js 24+, macOS or Linux)
+- Receive: `ad-hal-receive --new ~/Downloads`
+- Send: `ad-hal-send - ./file` (then type the code at the prompt)
+- License: MIT. Published by Nebarti, LLC.
+- Official packages: `@ad-hal/cli` and `@ad-hal/engine` only.
+
+## How it works
+
+- Peers find each other on HyperDHT and hole-punch through NAT; no port forwarding.
+- Two words of the code name a public DHT topic; the other three are the password to a CPace PAKE, so guesses can only be made online.
+- Every byte after the handshake is sealed with ChaCha20-Poly1305 under keys from the PAKE.
+- The receiver sees name, size and SHA-256 before accepting; files are verified and never overwrite existing ones.
+- Streams of unknown length (`tar c dir | ad-hal-send ...`) and resume of interrupted transfers are supported.
+
+## Limits
+
+- Not anonymous: each side's IP address is visible to the other and to nearby DHT nodes.
+- The drop code is a bearer capability; share it privately.
+- Windows is not yet supported for security purposes. The relay (`--relay=<key>`) is experimental.
+
+## Links
+
+- [Source code](https://github.com/khartig/adhal)
+- [Quickstart](https://github.com/khartig/adhal/blob/main/docs/QUICKSTART.md)
+- [Architecture](https://github.com/khartig/adhal/blob/main/docs/ARCHITECTURE.md)
+- [Protocol](https://github.com/khartig/adhal/blob/main/docs/PROTOCOL.md)
+- [Threat model](https://github.com/khartig/adhal/blob/main/docs/THREAT-MODEL.md)
+- [npm: @ad-hal/cli](https://www.npmjs.com/package/@ad-hal/cli)

@@ -1,0 +1,1166 @@
+<!doctype html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>adhal: send a file straight to them</title>
+  <meta name="description" content="adhal connects two devices directly and moves a file between them, end-to-end encrypted. No account, and no server storing it along the way." />
+  <meta name="theme-color" content="#0a0c10" />
+
+  <!-- Social share card (Open Graph + X/Twitter). og-image.png is 1200x630.
+       Most platforms need ABSOLUTE URLs here: once the site has a domain,
+       replace "og-image.png" with "https://<your-domain>/og-image.png" and
+       set og:url and the canonical link to the site's address. -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="adhal" />
+  <meta property="og:title" content="adhal: your file goes straight to them" />
+  <meta property="og:description" content="Direct, end-to-end encrypted, peer-to-peer file drops. No cloud copy, no account, just a five-word code." />
+  <meta property="og:url" content="https://github.com/khartig/adhal" />
+  <meta property="og:image" content="og-image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="adhal: Your file goes straight to them. Direct, end-to-end encrypted file drops." />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="adhal: your file goes straight to them" />
+  <meta name="twitter:description" content="Direct, end-to-end encrypted, peer-to-peer file drops. No cloud copy, no account." />
+  <meta name="twitter:image" content="og-image.png" />
+
+  <!-- Plain-text summary for AI tools (see llms.txt) -->
+  <link rel="alternate" type="text/plain" href="llms.txt" title="adhal summary for language models" />
+
+  <!-- Structured data: lets search engines and AI assistants describe adhal accurately -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "adhal",
+    "alternateName": "ad-hal",
+    "description": "Open-source, one-shot peer-to-peer file drop between two devices. The receiver shows a five-word code, the sender types it, and the file goes directly between the machines over the Holepunch DHT, end-to-end encrypted. No server stores the file and no account is needed.",
+    "applicationCategory": "UtilitiesApplication",
+    "operatingSystem": "macOS, Linux",
+    "softwareRequirements": "Node.js 24 or later",
+    "installUrl": "https://www.npmjs.com/package/@ad-hal/cli",
+    "downloadUrl": "https://www.npmjs.com/package/@ad-hal/cli",
+    "codeRepository": "https://github.com/khartig/adhal",
+    "license": "https://opensource.org/licenses/MIT",
+    "isAccessibleForFree": true,
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+    "keywords": "peer-to-peer file transfer, encrypted file sharing, send files without cloud, P2P file drop, magic wormhole alternative, hyperswarm, PAKE",
+    "publisher": { "@type": "Organization", "name": "Nebarti, LLC" }
+  }
+  </script>
+
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='1' y='1' width='30' height='30' rx='8' fill='%230b1220'/%3E%3Cpath d='M5 10l5 2-5 2zM5 18l5 2-5 2zM27 10l-5 2 5 2zM27 18l-5 2 5 2z' fill='%2322d3ee'/%3E%3Cpath d='M16 10l5 6-5 6-5-6z' fill='%23a5f3fc'/%3E%3C/svg%3E" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300..700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Geist', 'Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
+            mono: ['"Geist Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+          },
+          colors: {
+            // Visual vocabulary: charcoal surfaces + one accent. Nothing else.
+            ink: { 950: '#0a0c10', 900: '#0e1116', 850: '#11151c', 800: '#161b23', 700: '#1f2630', 600: '#2c3440' },
+            accent: { DEFAULT: '#22d3ee', soft: '#a5f3fc' },
+          },
+        },
+      },
+    }
+  </script>
+  <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js" defer></script>
+
+  <style>
+    :root { color-scheme: dark; --accent: #22d3ee; --ease: cubic-bezier(.65, 0, .35, 1); }
+    body { background: #0a0c10; -webkit-font-smoothing: antialiased; }
+    ::selection { background: rgba(34, 211, 238, .28); color: #fff; }
+
+    /* Static backdrop: faint grid, no ambient motion */
+    .grid-bg {
+      background-image:
+        linear-gradient(to right, rgba(148, 163, 184, .05) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(148, 163, 184, .05) 1px, transparent 1px);
+      background-size: 56px 56px;
+      mask-image: radial-gradient(ellipse 75% 65% at 50% 30%, #000 35%, transparent 100%);
+      -webkit-mask-image: radial-gradient(ellipse 75% 65% at 50% 30%, #000 35%, transparent 100%);
+    }
+    .surface { background: #0e1116; border: 1px solid rgba(148, 163, 184, .10); }
+
+    /* =========================================================
+       THE SIGNATURE MOTION: a line draws itself between two points.
+       Everything that moves on this page is a variation of it:
+       the connection, the stage timers, the roadmap, the dividers.
+       ========================================================= */
+    .draw { stroke-dasharray: 1 1; stroke-dashoffset: 1; transition: stroke-dashoffset 1s var(--ease), stroke .6s, opacity .6s; }
+    .hair { display: block; height: 1px; width: 40px; background: var(--accent); transform: scaleX(0); transform-origin: left; transition: transform 1s var(--ease); }
+    .hair.on { transform: scaleX(1); }
+
+    /* ---------- Scene states (classes on #stage) ---------- */
+    #scene text { font-family: Geist, sans-serif; }
+    #scene .mono { font-family: "Geist Mono", ui-monospace, monospace; }
+    .fade { opacity: 0; transition: opacity .5s ease; }
+
+    /* idle: an obvious drop target on the sender, a subtle receiver */
+    .zone-rect { transition: stroke .3s, stroke-opacity .5s, fill .3s; }
+    #stage.idle .zone-text { opacity: 1; }
+    #stage:not(.idle) .zone-rect { stroke-opacity: .16; }
+    #stage.dragging .zone-rect { stroke: var(--accent); stroke-opacity: 1; fill: rgba(34, 211, 238, .06); }
+    #stage.idle .zone-hit { cursor: pointer; }
+    #stage.idle .zone-hit:hover + .zone-rect, #stage.idle .zone-rect:hover { fill: rgba(34, 211, 238, .04); }
+    .ep-r { opacity: .4; transition: opacity .6s; }
+
+    /* The sample file: the only thing the demo ever "sends" */
+    #sampleFile {
+      position: absolute; z-index: 5; touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none;
+      transform: translate(calc(-50% + var(--dx, 0px)), calc(-50% + var(--dy, 0px)));
+      transition: transform .5s var(--ease), opacity .3s, border-color .2s, box-shadow .2s;
+    }
+    #sampleFile:hover, #sampleFile:focus-visible { border-color: rgba(34, 211, 238, .55); }
+    #sampleFile:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+    #sampleFile.is-dragging { transition: opacity .3s; cursor: grabbing; box-shadow: 0 16px 40px -14px rgba(34, 211, 238, .5); }
+    #stage:not(.idle) #sampleFile { opacity: 0; pointer-events: none; }
+    .guide { stroke-dasharray: 1 1; stroke-dashoffset: 1; transition: stroke-dashoffset 1.1s var(--ease), opacity .3s; }
+    .ready.idle .guide { stroke-dashoffset: 0; transition-delay: .5s; }
+    .guide-tip { opacity: 0; transition: opacity .3s; }
+    .ready.idle .guide-tip { opacity: 1; transition-delay: 1.4s; }
+    #stage:not(.idle) .guide, #stage:not(.idle) .guide-tip, #stage.dragging .guide, #stage.dragging .guide-tip { opacity: 0; transition-delay: 0s; }
+    #stage:not(.idle) .ep-r { opacity: 1; }
+
+    /* 1 · Pair */
+    .at0 .code-r { opacity: 1; }
+    .at0 .oob { stroke-dashoffset: 0; transition-delay: .5s; }
+    .at0 .oob-label { opacity: 1; transition-delay: 1s; }
+    .at0 .code-s { opacity: 1; transition-delay: 1.6s; }
+
+    /* 2 · Find */
+    .dht { opacity: 0; transition: opacity .6s; }
+    .at1 .dht { opacity: 1; }
+    .r2 .dht { opacity: .3; }
+    .at1 .dht-cap { opacity: 1; transition-delay: .7s; }
+    .r1 .arc { stroke-dashoffset: 0; }
+    .r2 .arc { opacity: .3; }
+    .conn { stroke: #475569; }
+    .r1 .conn { stroke-dashoffset: 0; transition-delay: .9s; }
+    .r1 .badge { opacity: 1; transition-delay: 1.7s; }
+
+    /* 3 · Seal: a pulse runs in from both ends; the line takes the accent */
+    .r2 .conn { stroke: var(--accent); }
+    .badge-sealed { opacity: 0; transition: opacity .4s; }
+    .badge-direct { transition: opacity .4s; }
+    .r2 .badge-direct { opacity: 0; }
+    .r2 .badge-sealed { opacity: 1; }
+    .r2 .badge-rect { stroke: rgba(34, 211, 238, .5); }
+    .pulse { stroke-dasharray: .12 1.2; stroke-dashoffset: .12; opacity: 0; }
+    .at2 .pulse { animation: run 1.1s var(--ease) 2; }
+    @keyframes run { 0% { opacity: 1; stroke-dashoffset: .12; } 100% { opacity: 1; stroke-dashoffset: -1; } }
+    .ring { transition: stroke .6s; }
+    .r2 .ring { stroke: rgba(34, 211, 238, .55); }
+    .at2 .cap-key { opacity: 1; transition-delay: 1.1s; }
+
+    /* 4 · Transfer (offer card and progress are driven from JS) */
+    .show-offer .offer { opacity: 1; }
+    .at3 .prog { opacity: 1; }
+
+    /* 5 · Verify */
+    .at4 .ring-r { stroke: var(--accent); stroke-width: 2; }
+    .at4 .cap-ver { opacity: 1; }
+
+    .chip { opacity: 0; transition: opacity .4s; }
+    #stage:not(.idle) .chip { opacity: 1; }
+
+    /* ---------- Stage tabs: the timer bar is the signature line again ---------- */
+    .tab { position: relative; }
+    .tab-bar { position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; background: var(--accent); transform: scaleX(0); transform-origin: left; }
+    .tab[aria-selected="true"] { color: #fff; }
+    .tab[aria-selected="true"] .tab-num { color: var(--accent); }
+    .tab.full .tab-bar { transform: scaleX(1); transition: transform .5s var(--ease); }
+
+    /* ---------- Roadmap rail ---------- */
+    .rail-fill { transform: scaleX(0); transform-origin: left; transition: transform 1.8s var(--ease); }
+    .rail-on .rail-fill { transform: scaleX(1); }
+    .phase-dot { transition: border-color .6s, color .6s; }
+    .rail-on .phase-dot.lit { border-color: var(--accent); color: var(--accent); }
+    .rail-on article:nth-child(2) .phase-dot { transition-delay: .9s; }
+    .rail-on article:nth-child(3) .phase-dot { transition-delay: 1.7s; }
+
+    /* ---------- Terminal ---------- */
+    .term-body { font-family: "Geist Mono", ui-monospace, monospace; font-size: 12.5px; line-height: 1.7; }
+    .caret { display: inline-block; width: .55em; height: 1.1em; margin-left: 1px; vertical-align: -2px; background: var(--accent); animation: blink 1.05s steps(1) infinite; }
+    @keyframes blink { 50% { opacity: 0; } }
+    .bar { height: 3px; border-radius: 9999px; background: rgba(148, 163, 184, .14); overflow: hidden; }
+    .bar > i { display: block; height: 100%; width: 0; background: var(--accent); }
+
+    /* ---------- Glossary terms ---------- */
+    .term { color: #e2e8f0; text-decoration: underline dotted rgba(34, 211, 238, .6); text-underline-offset: 4px; text-decoration-thickness: 1px; cursor: help; transition: color .2s, text-decoration-color .2s; }
+    .term:hover, .term:focus-visible { color: #a5f3fc; text-decoration-color: var(--accent); }
+    .term:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+
+    /* ---------- Send dialog ---------- */
+    dialog::backdrop { background: rgba(5, 6, 9, .72); backdrop-filter: blur(4px); }
+    dialog[open] { animation: rise .35s var(--ease); }
+    @keyframes rise { from { opacity: 0; transform: translateY(8px); } }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+      .hair, .rail-fill { transform: none; }
+    }
+  </style>
+</head>
+
+<body class="font-sans text-slate-300 overflow-x-hidden">
+
+  <!-- =========================================================
+       NAVIGATION: "Send a file" stays reachable from anywhere
+       ========================================================= -->
+  <header id="nav" class="fixed inset-x-0 top-0 z-50 transition-colors duration-300">
+    <nav class="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
+      <a href="#top" class="flex items-center gap-2.5" aria-label="adhal home">
+        <svg class="h-7 w-7" viewBox="0 0 32 32" aria-hidden="true">
+          <rect x="1" y="1" width="30" height="30" rx="8" fill="#0b1220" stroke="rgba(34,211,238,.35)" />
+          <path d="M5 10l5 2-5 2zM5 18l5 2-5 2zM27 10l-5 2 5 2zM27 18l-5 2 5 2z" fill="#22d3ee" />
+          <path d="M16 10l5 6-5 6-5-6z" fill="#a5f3fc" />
+        </svg>
+        <span class="text-[17px] font-semibold tracking-tight text-white">adhal</span>
+      </a>
+      <div class="hidden items-center gap-8 text-sm md:flex">
+        <a href="#top" class="text-slate-400 transition-colors hover:text-white">How it works</a>
+        <a href="#details" class="text-slate-400 transition-colors hover:text-white">Under the hood</a>
+        <a href="#roadmap" class="text-slate-400 transition-colors hover:text-white">Roadmap</a>
+        <a href="https://github.com/khartig/adhal/tree/main/docs" class="text-slate-400 transition-colors hover:text-white">Docs</a>
+      </div>
+      <div class="flex items-center gap-2">
+        <a href="https://github.com/khartig/adhal" class="hidden h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-white/5 hover:text-white sm:flex" aria-label="adhal on GitHub">
+          <i data-lucide="github" class="h-[18px] w-[18px]"></i>
+        </a>
+        <button data-open-send class="inline-flex h-9 items-center gap-1.5 rounded-lg bg-white px-3.5 text-sm font-medium text-ink-950 transition hover:bg-accent-soft">
+          Send a file <i data-lucide="arrow-up-right" class="h-3.5 w-3.5"></i>
+        </button>
+      </div>
+    </nav>
+  </header>
+
+  <main id="top">
+
+    <!-- =========================================================
+         HERO: "Make the connection"
+         One sentence, an obvious drop target, two subtle endpoints.
+         ========================================================= -->
+    <section class="relative isolate overflow-hidden pb-20 pt-28 sm:pt-32">
+      <div class="grid-bg absolute inset-0 -z-10"></div>
+
+      <div class="mx-auto max-w-5xl px-4 sm:px-6">
+        <div class="mx-auto max-w-3xl text-center">
+          <h1 class="text-[2.4rem] font-semibold leading-[1.05] tracking-[-0.035em] text-white sm:text-6xl">Send a file straight to them.</h1>
+          <p class="mx-auto mt-5 max-w-2xl text-base leading-relaxed text-slate-400 sm:text-lg">
+            adhal connects two devices directly and moves a file between them, end-to-end encrypted.
+            No account, and no server storing it along the way.
+          </p>
+        </div>
+
+        <!-- The stage -->
+        <div id="stage" class="idle surface relative mt-10 overflow-hidden rounded-2xl">
+          <div id="sceneWrap" class="relative"></div>
+
+          <!-- Idle panel: the secondary invitation -->
+          <div id="panelIdle" class="flex flex-col items-center justify-between gap-4 border-t border-white/5 px-5 py-4 sm:flex-row">
+            <p class="flex items-center gap-2 text-[13px] text-slate-500">
+              <i data-lucide="lock" class="h-3.5 w-3.5 shrink-0"></i>
+              <span id="idleNote">A simulation with a sample file. Nothing on your device is read or sent.</span>
+            </p>
+            <div class="flex shrink-0 gap-2">
+              <button id="trySample" class="inline-flex h-10 items-center gap-2 rounded-lg border border-accent/40 px-4 text-sm font-medium text-accent-soft transition hover:border-accent hover:bg-accent/5">
+                <i data-lucide="play" class="h-3.5 w-3.5"></i> Try a sample transfer
+              </button>
+            </div>
+          </div>
+
+          <!-- Live panel: labelled stages to explore -->
+          <div id="panelLive" class="hidden border-t border-white/5">
+            <div id="tabs" role="tablist" aria-label="What happens during a drop" class="grid grid-cols-5 border-b border-white/5"></div>
+            <div class="grid gap-5 px-5 py-5 md:grid-cols-[1fr_auto] md:gap-10">
+              <div aria-live="polite" class="min-h-[9.5rem] sm:min-h-[8rem]">
+                <h2 id="stTitle" class="text-lg font-medium tracking-tight text-white"></h2>
+                <p id="stBody" class="mt-2 max-w-2xl text-sm leading-relaxed text-slate-400"></p>
+                <p id="stSeen" class="mt-3 flex max-w-2xl gap-2 text-[13px] leading-relaxed text-slate-500"></p>
+              </div>
+              <div id="doneActions" class="hidden flex-row flex-wrap items-start gap-2 md:flex-col md:items-stretch">
+                <button data-open-send id="sendReal" class="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-white px-4 text-sm font-medium text-ink-950 transition hover:bg-accent-soft">Send a real file</button>
+                <button id="replay" class="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg px-3 text-sm text-slate-500 transition hover:text-white"><i data-lucide="rotate-ccw" class="h-3.5 w-3.5"></i> Replay</button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <p class="mt-5 text-center text-sm text-slate-500">
+          Ready for the real thing?
+          <button data-open-send class="text-slate-200 underline decoration-white/20 underline-offset-4 transition hover:decoration-accent">Send a file</button>
+          with the adhal CLI, or
+          <a href="https://github.com/khartig/adhal" class="text-slate-200 underline decoration-white/20 underline-offset-4 transition hover:decoration-accent">read the source</a>.
+        </p>
+      </div>
+    </section>
+
+    <!-- =========================================================
+         TODAY: the same drop in the terminal
+         ========================================================= -->
+    <section id="today" class="border-t border-white/5 py-24 sm:py-32">
+      <div class="mx-auto max-w-6xl px-4 sm:px-6">
+        <div class="max-w-2xl">
+          <span class="hair"></span>
+          <h2 class="mt-5 text-3xl font-semibold tracking-tight text-white sm:text-5xl">Today, it's two commands.</h2>
+          <p class="mt-5 text-slate-400 sm:text-lg">The engine and command-line tools are live on npm for macOS and Linux. Desktop and mobile apps come next.</p>
+        </div>
+
+        <div class="surface mt-12 overflow-hidden rounded-2xl">
+          <div class="flex items-center justify-between border-b border-white/5 px-4 py-3">
+            <div class="flex items-center gap-1.5">
+              <span class="h-2.5 w-2.5 rounded-full bg-white/10"></span><span class="h-2.5 w-2.5 rounded-full bg-white/10"></span><span class="h-2.5 w-2.5 rounded-full bg-white/10"></span>
+            </div>
+            <div class="font-mono text-[11px] text-slate-500">two machines · two networks · one drop</div>
+            <span class="w-[42px]" aria-hidden="true"></span>
+          </div>
+          <div class="grid md:grid-cols-2">
+            <div class="border-b border-white/5 md:border-b-0 md:border-r">
+              <div class="px-4 pt-3 text-[11px] uppercase tracking-widest text-slate-500">Receiver</div>
+              <div id="termRecv" class="term-body min-h-[290px] px-4 pb-5 pt-2"></div>
+            </div>
+            <div>
+              <div class="px-4 pt-3 text-[11px] uppercase tracking-widest text-slate-500">Sender</div>
+              <div id="termSend" class="term-body min-h-[290px] px-4 pb-5 pt-2"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================================================
+         THE SHIFT
+         ========================================================= -->
+    <section id="shift" class="border-t border-white/5 py-24 sm:py-32">
+      <div class="mx-auto max-w-6xl px-4 sm:px-6">
+        <div class="max-w-2xl">
+          <span class="hair"></span>
+          <h2 class="mt-5 text-3xl font-semibold tracking-tight text-white sm:text-5xl">Sharing a file shouldn't mean leaving a copy behind.</h2>
+        </div>
+        <div class="mt-14 grid gap-px overflow-hidden rounded-2xl border border-white/5 bg-white/5 md:grid-cols-3">
+          <article class="bg-ink-950 p-7">
+            <p class="text-xs uppercase tracking-widest text-slate-600">Usually: stored</p>
+            <h3 class="mt-3 text-xl font-medium text-white">Direct</h3>
+            <p class="mt-2 text-sm leading-relaxed text-slate-400">Most sharing is an upload to someone else's servers. adhal sends device to device, so there's no hosted copy to retain or leak.</p>
+          </article>
+          <article class="bg-ink-950 p-7">
+            <p class="text-xs uppercase tracking-widest text-slate-600">Usually: readable</p>
+            <h3 class="mt-3 text-xl font-medium text-white">Sealed</h3>
+            <p class="mt-2 text-sm leading-relaxed text-slate-400">Keys are derived on the two devices from the code, and the code is never sent. Anything carrying the traffic sees only ciphertext.</p>
+          </article>
+          <article class="bg-ink-950 p-7">
+            <p class="text-xs uppercase tracking-widest text-slate-600">Usually: capped</p>
+            <h3 class="mt-3 text-xl font-medium text-white">Unbound</h3>
+            <p class="mt-2 text-sm leading-relaxed text-slate-400">No account, no plan tiers. Pipe a stream of unknown length straight in, and an interrupted transfer resumes where it stopped.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================================================
+         UNDER THE HOOD: a spec sheet, set in strong type
+         ========================================================= -->
+    <section id="details" class="border-t border-white/5 py-24 sm:py-32">
+      <div class="mx-auto max-w-6xl px-4 sm:px-6">
+        <div class="max-w-2xl">
+          <span class="hair"></span>
+          <h2 class="mt-5 text-3xl font-semibold tracking-tight text-white sm:text-5xl">Under the hood.</h2>
+          <p class="mt-5 text-slate-400 sm:text-lg">Built on Holepunch's <button type="button" class="term" data-term="hyperdht">HyperDHT</button> and <button type="button" class="term" data-term="hyperswarm">Hyperswarm</button>, with a small, specified protocol on top. adhal runs no servers of its own.</p>
+        </div>
+
+        <dl class="mt-14 divide-y divide-white/5 border-y border-white/5">
+          <div class="grid gap-2 py-6 md:grid-cols-[220px_1fr] md:gap-10">
+            <dt class="font-medium text-white">Discovery</dt>
+            <dd class="text-slate-400">Peers meet on <button type="button" class="term" data-term="hyperdht">HyperDHT</button> and hole-punch through home routers and carrier-grade <button type="button" class="term" data-term="nat">NAT</button>. No port forwarding.</dd>
+          </div>
+          <div class="grid gap-2 py-6 md:grid-cols-[220px_1fr] md:gap-10">
+            <dt class="font-medium text-white">Pairing</dt>
+            <dd class="text-slate-400">Five words: a two-word public meeting point and a three-word secret (about 38.8 bits) used as the password for a <button type="button" class="term" data-term="cpace">CPace PAKE</button>. Guesses can only be tried live.</dd>
+          </div>
+          <div class="grid gap-2 py-6 md:grid-cols-[220px_1fr] md:gap-10">
+            <dt class="font-medium text-white">Encryption</dt>
+            <dd class="text-slate-400">Every frame after the handshake is sealed with <button type="button" class="term" data-term="chacha">ChaCha20-Poly1305</button> under keys from the PAKE, with frame lengths authenticated.</dd>
+          </div>
+          <div class="grid gap-2 py-6 md:grid-cols-[220px_1fr] md:gap-10">
+            <dt class="font-medium text-white">Integrity</dt>
+            <dd class="text-slate-400">The receiver sees name, size and <button type="button" class="term" data-term="sha256">SHA-256</button> before accepting. The file is saved only when its digest matches, and never over an existing file.</dd>
+          </div>
+          <div class="grid gap-2 py-6 md:grid-cols-[220px_1fr] md:gap-10">
+            <dt class="font-medium text-white">Fallback</dt>
+            <dd class="text-slate-400">For networks that can't connect directly, an opt-in relay (<code class="font-mono text-[0.9em] text-slate-300">--relay=&lt;key&gt;</code>) carries the encrypted traffic. It's experimental; the relay sees both IP addresses, never the file.</dd>
+          </div>
+          <div class="grid gap-2 py-6 md:grid-cols-[220px_1fr] md:gap-10">
+            <dt class="font-medium text-white">Protocol</dt>
+            <dd class="text-slate-400">Wire protocol v2, specified and frozen, with a conformance suite. MIT licensed. <a href="https://github.com/khartig/adhal/blob/main/docs/PROTOCOL.md" class="text-slate-200 underline decoration-white/20 underline-offset-4 hover:decoration-accent">Read the spec</a>.</dd>
+          </div>
+        </dl>
+
+        <div class="mt-10 grid gap-6 text-sm sm:grid-cols-3">
+          <p><span class="text-slate-200">Private, not anonymous.</span> <span class="text-slate-500">Each side sees the other's IP address, as do DHT nodes near the meeting point.</span></p>
+          <p><span class="text-slate-200">The code is the key.</span> <span class="text-slate-500">Whoever holds it can complete the drop. Hand it over privately.</span></p>
+          <p><span class="text-slate-200">macOS and Linux today.</span> <span class="text-slate-500">Windows follows once it's covered by CI. <a href="https://github.com/khartig/adhal/blob/main/docs/THREAT-MODEL.md" class="text-slate-300 underline decoration-white/20 underline-offset-4 hover:decoration-accent">Threat model</a>.</span></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================================================
+         ROADMAP
+         ========================================================= -->
+    <section id="roadmap" class="border-t border-white/5 py-24 sm:py-32">
+      <div class="mx-auto max-w-6xl px-4 sm:px-6">
+        <div class="max-w-2xl">
+          <span class="hair"></span>
+          <h2 class="mt-5 text-3xl font-semibold tracking-tight text-white sm:text-5xl">From the command line to every screen.</h2>
+        </div>
+
+        <div id="roadmapWrap" class="relative mt-14">
+          <div class="absolute left-0 right-0 top-[46px] hidden h-px bg-white/5 md:block"></div>
+          <div class="rail-fill absolute left-0 right-0 top-[46px] hidden h-px bg-gradient-to-r from-accent via-accent/50 to-transparent md:block"></div>
+          <div class="grid gap-4 md:grid-cols-3">
+            <article class="surface relative rounded-2xl p-6">
+              <div class="flex items-center justify-between">
+                <span class="phase-dot lit relative z-10 flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-ink-950 font-mono text-sm text-slate-300">01</span>
+                <span class="inline-flex items-center gap-1.5 rounded-full border border-accent/30 px-2.5 py-1 text-[11px] font-medium text-accent-soft"><span class="h-1.5 w-1.5 rounded-full bg-accent"></span> Live now</span>
+              </div>
+              <h3 class="mt-6 text-lg font-medium text-white">Core engine &amp; CLI</h3>
+              <ul class="mt-4 space-y-2 text-sm text-slate-400">
+                <li><code class="font-mono text-[12.5px]">@ad-hal/engine</code> and <code class="font-mono text-[12.5px]">@ad-hal/cli</code> on npm</li>
+                <li>Wire protocol v2, specified and frozen</li>
+                <li>Security review worked through; conformance suite</li>
+                <li class="text-slate-500">Opt-in relay for the hardest NATs (experimental)</li>
+              </ul>
+            </article>
+            <article class="surface relative rounded-2xl p-6">
+              <div class="flex items-center justify-between">
+                <span class="phase-dot lit relative z-10 flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-ink-950 font-mono text-sm text-slate-300">02</span>
+                <span class="inline-flex items-center rounded-full border border-white/10 px-2.5 py-1 text-[11px] font-medium text-slate-300">Coming soon</span>
+              </div>
+              <h3 class="mt-6 text-lg font-medium text-white">Desktop &amp; mobile apps</h3>
+              <ul class="mt-4 space-y-2 text-sm text-slate-400">
+                <li>LAN discovery for drops on the same network</li>
+                <li>macOS and Linux desktop app, then Windows</li>
+                <li>Android, then iOS. Scan a QR, done.</li>
+              </ul>
+              <div class="mt-6 flex gap-2 opacity-50" aria-hidden="true">
+                <span class="h-8 flex-1 rounded-lg border border-dashed border-white/10"></span>
+                <span class="h-8 flex-1 rounded-lg border border-dashed border-white/10"></span>
+              </div>
+            </article>
+            <article class="surface relative rounded-2xl p-6">
+              <div class="flex items-center justify-between">
+                <span class="phase-dot relative z-10 flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-ink-950 font-mono text-sm text-slate-400">03</span>
+                <span class="inline-flex items-center rounded-full border border-white/10 px-2.5 py-1 text-[11px] font-medium text-slate-400">In development</span>
+              </div>
+              <h3 class="mt-6 text-lg font-medium text-white">Ecosystem &amp; plugins</h3>
+              <ul class="mt-4 space-y-2 text-sm text-slate-400">
+                <li>A UI-free engine any front end can build on</li>
+                <li>Plugin architecture for integrations and workflows</li>
+                <li>Conformance vectors so independent clients interoperate</li>
+              </ul>
+            </article>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================================================
+         CLOSING
+         ========================================================= -->
+    <section class="border-t border-white/5 py-28">
+      <div class="mx-auto max-w-2xl px-4 text-center sm:px-6">
+        <h2 class="text-4xl font-semibold tracking-tight text-white sm:text-6xl">Make the connection.</h2>
+        <p class="mt-5 text-slate-400 sm:text-lg">Open source, MIT licensed, and built in the open.</p>
+        <div class="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
+          <button data-open-send class="inline-flex h-11 items-center gap-2 rounded-xl bg-white px-5 text-sm font-medium text-ink-950 transition hover:bg-accent-soft">Send a file</button>
+          <a href="https://github.com/khartig/adhal" class="inline-flex h-11 items-center gap-2 rounded-xl border border-white/10 px-5 text-sm text-slate-300 transition hover:border-white/25 hover:text-white"><i data-lucide="github" class="h-4 w-4"></i> View on GitHub</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- =========================================================
+       FOOTER
+       ========================================================= -->
+  <footer class="border-t border-white/5">
+    <div class="mx-auto max-w-6xl px-4 py-12 sm:px-6">
+      <div class="flex flex-col gap-10 md:flex-row md:justify-between">
+        <div class="max-w-sm">
+          <div class="flex items-center gap-2.5">
+            <svg class="h-6 w-6" viewBox="0 0 32 32" aria-hidden="true">
+              <rect x="1" y="1" width="30" height="30" rx="8" fill="#0b1220" stroke="rgba(34,211,238,.35)" />
+              <path d="M5 10l5 2-5 2zM5 18l5 2-5 2zM27 10l-5 2 5 2zM27 18l-5 2 5 2z" fill="#22d3ee" />
+              <path d="M16 10l5 6-5 6-5-6z" fill="#a5f3fc" />
+            </svg>
+            <span class="font-semibold tracking-tight text-white">adhal</span>
+            <span class="ml-1 text-slate-600" title="ad-ḫal, Sumerian for 'secret'">𒀜𒄬</span>
+          </div>
+          <p class="mt-4 text-sm leading-relaxed text-slate-500">From the Sumerian <em>ad-ḫal</em>, “secret”: something sealed between those who share it. Privacy should be the default, not a feature.</p>
+        </div>
+        <div class="grid grid-cols-2 gap-10 text-sm sm:grid-cols-3">
+          <div>
+            <p class="font-medium text-slate-300">Project</p>
+            <ul class="mt-3 space-y-2 text-slate-500">
+              <li><a href="https://github.com/khartig/adhal" class="hover:text-white">GitHub</a></li>
+              <li><a href="https://github.com/khartig/adhal/releases" class="hover:text-white">Releases</a></li>
+              <li><a href="https://www.npmjs.com/package/@ad-hal/cli" class="hover:text-white">npm</a></li>
+            </ul>
+          </div>
+          <div>
+            <p class="font-medium text-slate-300">Docs</p>
+            <ul class="mt-3 space-y-2 text-slate-500">
+              <li><a href="https://github.com/khartig/adhal/blob/main/docs/ARCHITECTURE.md" class="hover:text-white">Architecture</a></li>
+              <li><a href="https://github.com/khartig/adhal/blob/main/docs/PROTOCOL.md" class="hover:text-white">Protocol</a></li>
+              <li><a href="https://github.com/khartig/adhal/blob/main/docs/THREAT-MODEL.md" class="hover:text-white">Threat model</a></li>
+            </ul>
+          </div>
+          <div>
+            <p class="font-medium text-slate-300">Security</p>
+            <ul class="mt-3 space-y-2 text-slate-500">
+              <li><a href="https://github.com/khartig/adhal/blob/main/SECURITY.md" class="hover:text-white">Report an issue</a></li>
+              <li><a href="https://github.com/khartig/adhal/blob/main/docs/SECURITY-REVIEW.md" class="hover:text-white">Security review</a></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="mt-12 flex flex-col gap-3 border-t border-white/5 pt-6 text-xs text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+        <p>© 2026 Nebarti, LLC · adhal is MIT licensed</p>
+        <p class="font-mono">no trackers · no analytics · no cookies on this page</p>
+      </div>
+    </div>
+  </footer>
+
+  <!-- =========================================================
+       SEND A REAL FILE (there is no browser client yet, so this
+       hands the visitor the real CLI steps)
+       ========================================================= -->
+  <!-- =========================================================
+       GLOSSARY: one dialog, filled from TERMS in the script
+       ========================================================= -->
+  <dialog id="termDialog" aria-labelledby="termTitle" class="w-[min(520px,calc(100vw-32px))] rounded-2xl border border-white/10 bg-ink-900 p-0 text-slate-300 shadow-2xl">
+    <div class="p-6 sm:p-7">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <p id="termKind" class="font-mono text-[11px] uppercase tracking-[0.18em] text-accent"></p>
+          <h2 id="termTitle" class="mt-2 text-xl font-semibold tracking-tight text-white"></h2>
+        </div>
+        <button id="closeTerm" class="-mr-2 -mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-white/5 hover:text-white" aria-label="Close"><i data-lucide="x" class="h-4 w-4"></i></button>
+      </div>
+      <p id="termWhat" class="mt-4 text-sm leading-relaxed text-slate-300"></p>
+      <div class="mt-5 rounded-xl border border-white/5 bg-ink-950 p-4">
+        <p class="text-xs font-medium uppercase tracking-widest text-slate-500">In adhal</p>
+        <p id="termUse" class="mt-2 text-sm leading-relaxed text-slate-400"></p>
+      </div>
+      <a id="termLink" href="#" target="_blank" rel="noopener" class="mt-5 inline-flex items-center gap-1.5 text-sm text-slate-300 underline decoration-white/20 underline-offset-4 hover:decoration-accent">Learn more <i data-lucide="arrow-up-right" class="h-3.5 w-3.5"></i></a>
+    </div>
+  </dialog>
+
+  <dialog id="sendDialog" class="w-[min(560px,calc(100vw-32px))] rounded-2xl border border-white/10 bg-ink-900 p-0 text-slate-300 shadow-2xl">
+    <div class="p-6 sm:p-7">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <h2 class="text-xl font-semibold tracking-tight text-white">Send a real file</h2>
+          <p class="mt-2 text-sm leading-relaxed text-slate-400">Real drops run in the adhal command-line tool today; desktop and mobile apps are on the way. You need Node.js 24 or later, on macOS or Linux.</p>
+        </div>
+        <button id="closeSend" class="-mr-2 -mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-white/5 hover:text-white" aria-label="Close"><i data-lucide="x" class="h-4 w-4"></i></button>
+      </div>
+      <ol class="mt-6 space-y-3">
+        <li class="rounded-xl border border-white/5 bg-ink-950 p-4">
+          <div class="flex items-center justify-between text-xs text-slate-500"><span>1 · Install, on both machines</span><button class="copy-btn hover:text-white" data-copy="npm install --global @ad-hal/cli" aria-label="Copy"><i data-lucide="copy" class="copy-icon h-3.5 w-3.5"></i></button></div>
+          <pre class="mt-2 overflow-x-auto font-mono text-[13px] text-slate-200"><span class="text-accent">$</span> npm install --global @ad-hal/cli</pre>
+        </li>
+        <li class="rounded-xl border border-white/5 bg-ink-950 p-4">
+          <div class="flex items-center justify-between text-xs text-slate-500"><span>2 · The receiver shows a code</span><button class="copy-btn hover:text-white" data-copy="ad-hal-receive --new ~/Downloads" aria-label="Copy"><i data-lucide="copy" class="copy-icon h-3.5 w-3.5"></i></button></div>
+          <pre class="mt-2 overflow-x-auto font-mono text-[13px] text-slate-200"><span class="text-accent">$</span> ad-hal-receive --new ~/Downloads</pre>
+        </li>
+        <li class="rounded-xl border border-white/5 bg-ink-950 p-4">
+          <div class="flex items-center justify-between text-xs text-slate-500"><span>3 · You send, and type the code at the prompt</span><button class="copy-btn hover:text-white" data-copy="ad-hal-send - ./report.pdf" aria-label="Copy"><i data-lucide="copy" class="copy-icon h-3.5 w-3.5"></i></button></div>
+          <pre class="mt-2 overflow-x-auto font-mono text-[13px] text-slate-200"><span class="text-accent">$</span> ad-hal-send - ./report.pdf</pre>
+        </li>
+      </ol>
+      <div class="mt-6 flex flex-wrap gap-3">
+        <a href="https://github.com/khartig/adhal/blob/main/docs/QUICKSTART.md" class="inline-flex h-10 items-center gap-2 rounded-lg bg-white px-4 text-sm font-medium text-ink-950 hover:bg-accent-soft">Quickstart guide <i data-lucide="arrow-right" class="h-3.5 w-3.5"></i></a>
+        <a href="https://github.com/khartig/adhal" class="inline-flex h-10 items-center rounded-lg border border-white/10 px-4 text-sm text-slate-300 hover:border-white/25 hover:text-white">GitHub</a>
+      </div>
+    </div>
+  </dialog>
+
+  <script>
+  (() => {
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
+    const $ = id => document.getElementById(id)
+    window.addEventListener('DOMContentLoaded', () => window.lucide && lucide.createIcons())
+
+    /* =========================================================
+       Nav background on scroll
+       ========================================================= */
+    const nav = $('nav')
+    const onScroll = () => {
+      const s = window.scrollY > 8
+      nav.classList.toggle('bg-ink-950/80', s); nav.classList.toggle('backdrop-blur-xl', s)
+      nav.classList.toggle('border-b', s); nav.classList.toggle('border-white/5', s)
+    }
+    window.addEventListener('scroll', onScroll, { passive: true }); onScroll()
+
+    /* =========================================================
+       Glossary: click a dotted term to see what it means
+       ========================================================= */
+    const TERMS = {
+      hyperdht: {
+        kind: 'Peer discovery', title: 'HyperDHT',
+        what: 'A distributed hash table: a public network of computers that together work like a shared directory, with no central server. Built by Holepunch, it lets two devices look each other up by a key and then connect directly, punching through home routers along the way.',
+        use: 'Both devices look up the meeting point named by the first two words of the code. DHT nodes can see that meeting point and the devices\' IP addresses, but never the secret words or the file.',
+        link: 'https://github.com/holepunchto/hyperdht',
+      },
+      hyperswarm: {
+        kind: 'Peer connections', title: 'Hyperswarm',
+        what: 'Holepunch\'s library for finding and connecting to peers interested in the same topic. It runs on top of HyperDHT, handles the lookups and connection attempts, and hands back an encrypted connection to each peer it finds.',
+        use: 'adhal uses it to join the drop\'s topic and connect the sender to the receiver. adhal then adds its own end-to-end encryption on top, so security doesn\'t depend on the transport.',
+        link: 'https://github.com/holepunchto/hyperswarm',
+      },
+      nat: {
+        kind: 'Networking', title: 'NAT (Network Address Translation)',
+        what: 'Most home routers, and many mobile carriers (carrier-grade NAT), let several devices share one public IP address. A side effect is that devices outside can\'t reach yours directly. Hole punching gets around this: both devices reach out at the same moment, so each router lets the other\'s traffic in.',
+        use: 'adhal hole-punches through NAT, so neither side needs port forwarding. When both sides sit behind strict NATs, a direct connection may be impossible; that\'s what the opt-in relay is for (experimental).',
+        link: 'https://en.wikipedia.org/wiki/Network_address_translation',
+      },
+      cpace: {
+        kind: 'Key exchange', title: 'CPace PAKE',
+        what: 'A PAKE (password-authenticated key exchange) lets two parties who share a short password agree on strong encryption keys without ever sending the password. CPace is a modern PAKE being standardized by the IRTF Crypto Forum Research Group.',
+        use: 'The three secret words of the code are the password. Someone watching the exchange learns nothing that lets them test guesses offline, so every guess has to be tried live against a peer.',
+        link: 'https://datatracker.ietf.org/doc/draft-irtf-cfrg-cpace/',
+      },
+      chacha: {
+        kind: 'Encryption', title: 'ChaCha20-Poly1305',
+        what: 'An authenticated encryption scheme, standardized in RFC 8439. ChaCha20 scrambles the data so it can\'t be read; Poly1305 adds a tag that reveals any tampering. It\'s widely used, including in TLS and WireGuard, and is fast even on devices without encryption hardware.',
+        use: 'Every frame after the handshake is sealed with it, using keys from the PAKE, and frame lengths are authenticated too.',
+        link: 'https://www.rfc-editor.org/rfc/rfc8439',
+      },
+      sha256: {
+        kind: 'Integrity', title: 'SHA-256',
+        what: 'A cryptographic hash function: it turns any file into a 64-character fingerprint. Change a single bit and the fingerprint changes completely, and it\'s infeasible to make two different files share one.',
+        use: 'The receiver sees the file\'s SHA-256 before accepting it, and the file is saved only if what arrived has the same fingerprint.',
+        link: 'https://en.wikipedia.org/wiki/SHA-2',
+      },
+    }
+    const termDlg = $('termDialog')
+    document.querySelectorAll('.term').forEach(b => b.addEventListener('click', () => {
+      const t = TERMS[b.dataset.term]; if (!t) return
+      $('termKind').textContent = t.kind
+      $('termTitle').textContent = t.title
+      $('termWhat').textContent = t.what
+      $('termUse').textContent = t.use
+      $('termLink').href = t.link
+      termDlg.showModal()
+    }))
+    $('closeTerm').addEventListener('click', () => termDlg.close())
+    termDlg.addEventListener('click', e => { if (e.target === termDlg) termDlg.close() })
+
+    /* =========================================================
+       Send dialog + copy buttons
+       ========================================================= */
+    const dlg = $('sendDialog')
+    document.querySelectorAll('[data-open-send]').forEach(b => b.addEventListener('click', () => dlg.showModal()))
+    $('closeSend').addEventListener('click', () => dlg.close())
+    dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close() })
+
+    document.querySelectorAll('.copy-btn').forEach(btn => btn.addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(btn.dataset.copy) } catch { return }
+      const icon = btn.querySelector('.copy-icon'); if (!icon) return
+      const original = icon.outerHTML
+      icon.outerHTML = '<i data-lucide="check" class="copy-icon h-3.5 w-3.5 text-accent"></i>'; window.lucide && lucide.createIcons()
+      setTimeout(() => { btn.querySelector('.copy-icon').outerHTML = original; window.lucide && lucide.createIcons() }, 1400)
+    }))
+
+    /* =========================================================
+       THE STAGE
+       Every stage below states only what adhal actually does
+       (see the repo's README, PROTOCOL.md and THREAT-MODEL.md).
+       ========================================================= */
+    const STAGES = [
+      {
+        label: 'Pair', ms: 3400,
+        title: 'A one-time code pairs the two devices.',
+        body: 'The receiver shows five random words, or a QR code. The first two name a meeting point on the network. The last three are a secret that is never sent over the network.',
+        seen: () => 'Nothing yet. You hand the code over yourself, so choose a private route: whoever holds it can complete the drop.',
+      },
+      {
+        label: 'Find', ms: 3600,
+        title: 'The devices find each other and connect directly.',
+        body: 'Both look up the meeting point on HyperDHT, a public peer-to-peer network, then punch through their routers to open a direct connection. No port forwarding. If two strict networks can\'t connect directly, an opt-in relay can carry the encrypted traffic (experimental).',
+        seen: () => 'DHT nodes see the meeting point and both IP addresses. Never the secret, and never the file.',
+      },
+      {
+        label: 'Seal', ms: 3000,
+        title: 'Each device turns the secret into the same keys.',
+        body: 'A password-authenticated key exchange (CPace) derives matching keys on both ends without sending the secret. A wrong code gets nowhere.',
+        seen: () => 'Handshake messages that reveal nothing about the code. Guesses can only be tried live, never offline.',
+      },
+      {
+        label: 'Transfer', ms: 0,
+        title: 'The receiver approves, then the file streams across sealed.',
+        body: 'Before anything is written, the receiver sees the file\'s name, size and SHA-256 fingerprint, and chooses to accept. Every byte is then encrypted with ChaCha20-Poly1305 and sent device to device. No server stores it.',
+        seen: () => 'Anything in between, including an optional relay, sees encrypted bytes and IP addresses. Not the file.',
+      },
+      {
+        label: 'Verify', ms: 2600,
+        title: 'The file is checked before it\'s saved.',
+        body: 'The receiver compares the file\'s fingerprint with the sender\'s. Only a match is saved, and never on top of an existing file. Then the sender is told it arrived. An interrupted transfer resumes where it stopped.',
+        seen: () => 'Only the two devices ever hold the file. The receiver checks the fingerprint itself, and the confirmation travels back over the sealed connection.',
+      },
+    ]
+
+    /* Two layouts: side by side on wide screens, top to bottom on phones */
+    const LAYOUTS = {
+      wide: {
+        w: 1000, h: 440, fs: 1,
+        S: { x: 180, y: 280 }, R: { x: 820, y: 280 }, D: { x: 500, y: 84 }, dScale: 1,
+        zone: { x: 60, y: 150, w: 240, h: 232 }, zoneText: { x: 180, y: 190 }, zoneSub: { x: 180, y: 211 },
+        labelDy: 52, subDy: 70,
+        arcS: 'M180 256 Q300 110 486 90', arcR: 'M820 256 Q700 110 514 90',
+        connS: 'M204 280 L500 280', connR: 'M796 280 L500 280',
+        badge: { x: 500, y: 280, w: 176 }, badgeDirect: 'direct · hole-punched', badgeSealed: 'sealed end to end',
+        dhtLabel: { x: 500, y: 140 }, dhtCap: { x: 500, y: 158, a: 'middle' }, dhtCapText: 'sees the meeting point + IP addresses',
+        code: { x: 820, y: 152 }, codeCap: { x: 820, y: 174 },
+        codeS: { x: 180, y: 372 },
+        chipS: { x: 180, y: 222 }, chipR: { x: 820, y: 222 },
+        offer: { x: 820, y: 172 },
+        prog: { x: 500, y: 318, a: 'middle' },
+        capS: { x: 180, y: 372 }, capR: { x: 820, y: 372 }, verR: '✓ fingerprint matches · saved',
+        oob: 'M180 398 Q500 470 820 398',
+        sample: { x: 500, y: 214 }, guide: 'M400 214 Q340 214 306 238', tip: 'M306 238 l11 -1 M306 238 l4 -10',
+        zoneLine: 'Drop the sample here', zoneSubLine: 'drag the file onto your device',
+      },
+      narrow: {
+        w: 400, h: 660, fs: 1,
+        S: { x: 200, y: 150 }, R: { x: 200, y: 520 }, D: { x: 318, y: 335 }, dScale: .62,
+        zone: { x: 40, y: 34, w: 320, h: 240 }, zoneText: { x: 200, y: 72 }, zoneSub: { x: 200, y: 93 },
+        labelDy: 48, subDy: 65, side: { x: 166, a: 'end' },
+        arcS: 'M218 160 Q318 190 316 318', arcR: 'M218 510 Q318 480 316 352',
+        connS: 'M200 174 L200 335', connR: 'M200 496 L200 335',
+        badge: { x: 200, y: 335, w: 104 }, badgeDirect: 'direct', badgeSealed: 'sealed',
+        dhtLabel: { x: 330, y: 304, a: 'start' }, dhtLabelText: 'HyperDHT', dhtCap: { x: 0, y: 0 }, dhtCapText: '',
+        code: { x: 200, y: 616 }, codeCap: { x: 200, y: 638 },
+        codeS: { x: 234, y: 196, a: 'start' },
+        chipS: { x: 200, y: 100 }, chipR: { x: 200, y: 462 },
+        offer: { x: 200, y: 440 },
+        prog: { x: 140, y: 340, a: 'end' },
+        capS: { x: 166, y: 196, a: 'end' }, capR: { x: 166, y: 566, a: 'end' }, verR: '✓ matches · saved',
+        oob: 'M176 520 Q36 335 176 150',
+        sample: { x: 200, y: 372 }, guide: 'M200 340 L200 282', tip: 'M200 282 l-6 8 M200 282 l6 8',
+        zoneLine: 'Drop the sample here', zoneSubLine: 'drag the file up onto your device',
+      },
+    }
+    const DHT_DOTS = [[-58, -6], [-30, -22], [0, -12], [30, -24], [58, -2], [-40, 18], [-8, 20], [26, 16], [50, 22]]
+    const DHT_LINKS = [[0, 1], [1, 2], [2, 3], [3, 4], [0, 5], [5, 6], [6, 7], [7, 4], [1, 6], [2, 7], [3, 8], [7, 8]]
+
+    // The demo's only file. It exists solely as these few fields.
+    const SAMPLE = { name: 'report.pdf', size: 26004211, hash: '9c1e5b07d2f4a8c361e0b9d7f25a4c8e1b3d6f9a0c2e4b6d8f1a3c5e7b9d0a07f' }
+    const CODE_PUBLIC = 'amber-orbit', CODE_SECRET = '-velvet-lantern-quill'
+
+    const stage = $('stage'), wrap = $('sceneWrap')
+    let L = null, layoutKey = null
+    let file = SAMPLE
+    let current = -1        // stage index shown, -1 = idle
+    let runId = 0
+
+    const fmtSize = n => n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(1)} KB` : n < 1073741824 ? `${(n / 1048576).toFixed(1)} MB` : `${(n / 1073741824).toFixed(2)} GB`
+    const shortHash = h => h ? `${h.slice(0, 4)}…${h.slice(-4)}` : 'computing…'
+    const fitName = (s, max) => s.length <= max ? s : `${s.slice(0, Math.ceil(max / 2) - 1)}…${s.slice(-Math.floor(max / 2))}`
+
+    function buildScene() {
+      const t = (p, cls, txt, extra = '') => `<text x="${p.x}" y="${p.y}" text-anchor="${p.a || 'middle'}" class="${cls}" ${extra}>${txt}</text>`
+      const { S, R, D } = L
+      // endpoint labels sit under the node, or beside it when the line is vertical
+      const lab = (P, sub) => L.side
+        ? { x: L.side.x, y: P.y + (sub ? 14 : -2), a: L.side.a }
+        : { x: P.x, y: P.y + (sub ? L.subDy : L.labelDy) }
+      const dots = DHT_DOTS.map(([x, y]) => [D.x + x * L.dScale, D.y + y * L.dScale])
+      wrap.innerHTML = `
+      <svg id="scene" viewBox="0 0 ${L.w} ${L.h}" class="block h-auto w-full" role="img" aria-label="Two devices: your device on one side with a file drop target, their device on the other. Running the demo shows how adhal pairs, connects, seals and transfers a file between them.">
+        <!-- drop target around the sender -->
+        <rect class="zone-hit" x="${L.zone.x}" y="${L.zone.y}" width="${L.zone.w}" height="${L.zone.h}" fill="transparent" />
+        <rect class="zone-rect" x="${L.zone.x}" y="${L.zone.y}" width="${L.zone.w}" height="${L.zone.h}" rx="18" fill="transparent" stroke="#22d3ee" stroke-opacity=".55" stroke-width="1.2" stroke-dasharray="6 6" pointer-events="none" />
+        <g class="zone-text fade" pointer-events="none">
+          ${t(L.zoneText, '', L.zoneLine, 'fill="#e2e8f0" font-size="17" font-weight="500"')}
+          ${t(L.zoneSub, '', L.zoneSubLine, 'fill="#64748b" font-size="13"')}
+        </g>
+        <path class="guide" d="${L.guide}" pathLength="1" fill="none" stroke="#22d3ee" stroke-opacity=".5" stroke-width="1.2" stroke-linecap="round" />
+        <path class="guide-tip" d="${L.tip}" fill="none" stroke="#22d3ee" stroke-opacity=".5" stroke-width="1.2" stroke-linecap="round" />
+
+        <!-- 1 · out-of-band code handover -->
+        <path id="oobPath" class="draw oob" d="${L.oob}" pathLength="1" fill="none" stroke="#334155" stroke-width="1" />
+        <text class="oob-label fade" fill="#64748b" font-size="12" dy="-7"><textPath href="#oobPath" startOffset="50%" text-anchor="middle">you hand over the code yourself, privately</textPath></text>
+
+        <!-- 2 · the DHT -->
+        <g class="dht" pointer-events="none">
+          ${DHT_LINKS.map(([a, b]) => `<line x1="${dots[a][0]}" y1="${dots[a][1]}" x2="${dots[b][0]}" y2="${dots[b][1]}" stroke="#1f2937" />`).join('')}
+          ${dots.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="2.6" fill="#475569" />`).join('')}
+          <circle cx="${D.x}" cy="${D.y + 6 * L.dScale}" r="4" fill="#22d3ee" />
+          ${t(L.dhtLabel, 'mono', L.dhtLabelText || 'HyperDHT · public', 'fill="#94a3b8" font-size="12"')}
+        </g>
+        ${t(L.dhtCap, 'dht-cap fade', L.dhtCapText, 'fill="#64748b" font-size="12"')}
+        <path class="draw arc" d="${L.arcS}" pathLength="1" fill="none" stroke="#334155" stroke-width="1.2" />
+        <path class="draw arc" d="${L.arcR}" pathLength="1" fill="none" stroke="#334155" stroke-width="1.2" />
+
+        <!-- the connection: drawn from both ends, meeting in the middle -->
+        <path class="draw conn" d="${L.connS}" pathLength="1" fill="none" stroke-width="2" />
+        <path class="draw conn" d="${L.connR}" pathLength="1" fill="none" stroke-width="2" />
+        <path class="pulse" d="${L.connS}" pathLength="1" fill="none" stroke="#ecfeff" stroke-width="3" stroke-linecap="round" />
+        <path class="pulse" d="${L.connR}" pathLength="1" fill="none" stroke="#ecfeff" stroke-width="3" stroke-linecap="round" />
+        <g class="badge fade" transform="translate(${L.badge.x} ${L.badge.y})">
+          <rect class="badge-rect" x="${-L.badge.w / 2}" y="-15" width="${L.badge.w}" height="30" rx="15" fill="#0a0c10" stroke="rgba(148,163,184,.25)" />
+          <text class="badge-direct mono" y="4" text-anchor="middle" fill="#94a3b8" font-size="11.5">${L.badgeDirect}</text>
+          <text class="badge-sealed mono" y="4" text-anchor="middle" fill="#a5f3fc" font-size="11.5">${L.badgeSealed}</text>
+        </g>
+        ${t(L.prog, 'prog fade mono', '', 'id="prog" fill="#a5f3fc" font-size="12"')}
+
+        <!-- endpoints -->
+        <g class="ep-s">
+          <circle class="ring ring-s" cx="${S.x}" cy="${S.y}" r="22" fill="#0a0c10" stroke="rgba(148,163,184,.3)" stroke-width="1.2" />
+          <circle cx="${S.x}" cy="${S.y}" r="5" fill="#e2e8f0" />
+          ${t(lab(S, 0), '', 'Your device', 'fill="#e2e8f0" font-size="15" font-weight="500"')}
+          ${t(lab(S, 1), 'mono', 'sender', 'fill="#64748b" font-size="11"')}
+        </g>
+        <g class="ep-r">
+          <circle class="ring ring-r" cx="${R.x}" cy="${R.y}" r="22" fill="#0a0c10" stroke="rgba(148,163,184,.3)" stroke-width="1.2" />
+          <circle cx="${R.x}" cy="${R.y}" r="5" fill="#e2e8f0" />
+          ${t(lab(R, 0), '', 'Their device', 'fill="#e2e8f0" font-size="15" font-weight="500"')}
+          ${t(lab(R, 1), 'mono', 'receiver', 'fill="#64748b" font-size="11"')}
+        </g>
+
+        <!-- 1 · the code -->
+        <g class="code-r fade">
+          ${t(L.code, 'mono', `<tspan fill="#f1f5f9">${CODE_PUBLIC}</tspan><tspan fill="#22d3ee">${CODE_SECRET}</tspan>`, 'font-size="15"')}
+          ${t(L.codeCap, '', '<tspan fill="#94a3b8">meeting point</tspan><tspan fill="#475569"> · </tspan><tspan fill="#22d3ee">secret, never sent</tspan>', 'font-size="12"')}
+        </g>
+        ${t(L.codeS, 'code-s fade', 'code entered ✓', 'fill="#94a3b8" font-size="12.5"')}
+
+        <!-- 3 · keys -->
+        ${t(L.capS, 'cap-key fade', 'key derived here', 'fill="#a5f3fc" font-size="12.5"')}
+        ${t(L.capR, 'cap-key fade', 'same key derived here', 'fill="#a5f3fc" font-size="12.5"')}
+
+        <!-- 5 · verify -->
+        ${t(L.capS, 'cap-ver fade', '✓ receipt confirmed', 'fill="#a5f3fc" font-size="12.5"')}
+        ${t(L.capR, 'cap-ver fade', L.verR, 'fill="#a5f3fc" font-size="12.5"')}
+
+        <!-- 4 · the receiver's offer prompt -->
+        <g class="offer fade" transform="translate(${L.offer.x} ${L.offer.y})">
+          <rect x="-128" y="-36" width="256" height="72" rx="12" fill="#11151c" stroke="rgba(34,211,238,.45)" />
+          <text id="offerName" class="mono" x="-112" y="-12" fill="#e2e8f0" font-size="12"></text>
+          <text id="offerHash" class="mono" x="-112" y="7" fill="#64748b" font-size="12"></text>
+          <text id="offerAsk" class="mono" x="-112" y="26" fill="#a5f3fc" font-size="12">accept this file? [y/N]</text>
+        </g>
+
+        <!-- the file -->
+        <g id="chip" class="chip" transform="translate(${L.chipS.x} ${L.chipS.y})">
+          <rect x="-94" y="-25" width="188" height="50" rx="12" fill="#11151c" stroke="rgba(148,163,184,.28)" />
+          <path d="M-77 -13h11l7 7v19h-18z M-66 -13v7h7" fill="none" stroke="#94a3b8" stroke-width="1.3" stroke-linejoin="round" />
+          <text id="chipName" x="-49" y="-2" fill="#f1f5f9" font-size="13" font-weight="500"></text>
+          <text id="chipMeta" class="mono" x="-49" y="14" fill="#64748b" font-size="11"></text>
+        </g>
+      </svg>
+      <button id="sampleFile" type="button" style="left:${L.sample.x / L.w * 100}%; top:${L.sample.y / L.h * 100}%"
+        class="flex items-center gap-3 rounded-xl border border-white/15 bg-ink-850 py-2.5 pl-3 pr-4 text-left"
+        aria-label="Sample file, report.pdf. Drag it onto your device, or press Enter to run the demo.">
+        <svg class="h-4 w-3 shrink-0 text-slate-600" viewBox="0 0 6 10" fill="currentColor" aria-hidden="true"><circle cx="1" cy="1" r="1"/><circle cx="5" cy="1" r="1"/><circle cx="1" cy="5" r="1"/><circle cx="5" cy="5" r="1"/><circle cx="1" cy="9" r="1"/><circle cx="5" cy="9" r="1"/></svg>
+        <svg class="h-6 w-5 shrink-0 text-slate-400" viewBox="0 0 20 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><path d="M2 1h11l5 5v17H2z M13 1v5h5"/></svg>
+        <span class="block leading-tight">
+          <span class="block text-[13px] font-medium text-white">report.pdf</span>
+          <span class="block font-mono text-[11px] text-slate-500">sample file · 24.8 MB</span>
+        </span>
+      </button>`
+      wrap.querySelector('.zone-hit').addEventListener('click', () => { if (stage.classList.contains('idle')) start(SAMPLE) })
+      initSample()
+      setChipText(false)
+      refreshTexts()
+    }
+
+    function pickLayout() {
+      const key = stage.clientWidth < 680 ? 'narrow' : 'wide'
+      if (key === layoutKey) return
+      layoutKey = key; L = LAYOUTS[key]
+      buildScene()
+      if (current >= 0) render(current, true)
+    }
+
+    /* ---------- texts that depend on the file ---------- */
+    function setChipText(sealed) {
+      const n = $('chipName'), m = $('chipMeta'); if (!n) return
+      // in transit the file is shown as what an observer would see: ciphertext
+      n.classList.toggle('mono', sealed)
+      if (sealed) { n.setAttribute('fill', '#22d3ee'); m.textContent = 'ChaCha20-Poly1305' }
+      else { n.setAttribute('fill', '#f1f5f9'); n.textContent = fitName(file.name, 17); m.textContent = fmtSize(file.size) }
+    }
+    function refreshTexts() {
+      if (!$('offerName')) return
+      $('offerName').textContent = `${fitName(file.name, 18)} · ${fmtSize(file.size)}`
+      $('offerHash').textContent = `sha256 ${shortHash(file.hash)}`
+      if (current >= 0) $('stSeen').innerHTML = seenHTML(current)
+    }
+    const seenHTML = i => `<svg class="mt-[3px] h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><span><span class="text-slate-300">Who sees what:</span> ${STAGES[i].seen(file)}</span>`
+
+    /* ---------- tabs ---------- */
+    const tabs = $('tabs')
+    tabs.innerHTML = STAGES.map((s, i) => `
+      <button role="tab" data-i="${i}" aria-selected="false" class="tab flex flex-col items-center gap-0.5 px-1 py-3 text-[13px] text-slate-500 transition-colors hover:text-slate-200 sm:flex-row sm:justify-center sm:gap-2">
+        <span class="tab-num font-mono text-[11px]">0${i + 1}</span><span>${s.label}</span><i class="tab-bar"></i>
+      </button>`).join('')
+    tabs.addEventListener('click', e => {
+      const b = e.target.closest('.tab'); if (!b) return
+      goTo(+b.dataset.i)
+    })
+    tabs.addEventListener('keydown', e => {
+      if (!['ArrowLeft', 'ArrowRight'].includes(e.key)) return
+      const n = (current + (e.key === 'ArrowRight' ? 1 : STAGES.length - 1)) % STAGES.length
+      goTo(n); tabs.children[n].focus()
+    })
+    function selectTab(i, ms) {
+      [...tabs.children].forEach((b, j) => {
+        b.setAttribute('aria-selected', String(j === i))
+        b.tabIndex = j === i ? 0 : -1
+        const bar = b.querySelector('.tab-bar')
+        b.classList.remove('full'); bar.style.transition = 'none'; bar.style.transform = ''
+        if (j !== i) return
+        if (ms && !reduceMotion) {
+          // the timer is the signature line, drawing across the tab
+          void bar.offsetWidth
+          bar.style.transition = `transform ${ms}ms linear`; bar.style.transform = 'scaleX(1)'
+        } else b.classList.add('full')
+      })
+    }
+
+    /* ---------- scene state ---------- */
+    function render(i, instant) {
+      current = i
+      const cls = ['idle', 'r0', 'r1', 'r2', 'r3', 'r4', 'at0', 'at1', 'at2', 'at3', 'at4', 'show-offer']
+      stage.classList.remove(...cls)
+      for (let k = 0; k <= i; k++) stage.classList.add(`r${k}`)
+      stage.classList.add(`at${i}`)
+      $('stTitle').textContent = STAGES[i].title
+      $('stBody').textContent = STAGES[i].body
+      $('stSeen').innerHTML = seenHTML(i)
+      $('prog').textContent = ''
+      $('offerAsk').textContent = 'accept this file? [y/N]'
+      setChipText(false)
+      placeChip(i >= 4 ? 1 : 0)
+    }
+    function placeChip(t) {
+      const x = L.chipS.x + (L.chipR.x - L.chipS.x) * t, y = L.chipS.y + (L.chipR.y - L.chipS.y) * t
+      $('chip').setAttribute('transform', `translate(${x} ${y})`)
+    }
+
+    const wait = (ms, id) => new Promise(res => setTimeout(() => res(id === runId), ms))
+
+    async function transfer(id) {
+      stage.classList.add('show-offer')
+      if (!(await wait(1500, id))) return false
+      $('offerAsk').textContent = 'accept this file? [y/N] y'
+      if (!(await wait(700, id))) return false
+      stage.classList.remove('show-offer')
+      if (!(await wait(250, id))) return false
+      // the file leaves as ciphertext and arrives as itself
+      const dur = reduceMotion ? 1 : 2600, start = performance.now(), hex = '0123456789abcdef'
+      let lastGlyph = 0
+      setChipText(true)
+      await new Promise(res => {
+        const step = now => {
+          if (id !== runId) return res()
+          const t = Math.min(1, (now - start) / dur), e = t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2
+          placeChip(e)
+          $('prog').textContent = `${Math.round(e * 100)}%`
+          if (now - lastGlyph > 90) {
+            lastGlyph = now
+            $('chipName').textContent = Array.from({ length: 16 }, (_, k) => (k % 4 === 3 && k < 15 ? ' ' : hex[(Math.random() * 16) | 0])).join('')
+          }
+          t < 1 ? requestAnimationFrame(step) : res()
+        }
+        requestAnimationFrame(step)
+      })
+      if (id !== runId) return false
+      setChipText(false)
+      return true
+    }
+
+    // Manual stage selection: stops autoplay, shows that stage
+    function goTo(i) {
+      const id = ++runId
+      render(i); selectTab(i)
+      if (i === 3) transfer(id)
+      showDone(true)
+    }
+
+    async function autoplay() {
+      const id = ++runId
+      showDone(false)
+      for (let i = 0; i < STAGES.length; i++) {
+        render(i)
+        if (i === 3) {
+          selectTab(i, 5300)
+          if (!(await transfer(id))) return
+          if (!(await wait(900, id))) return
+        } else {
+          selectTab(i, STAGES[i].ms)
+          if (!(await wait(STAGES[i].ms, id))) return
+        }
+      }
+      selectTab(4); showDone(true)
+    }
+
+    function showDone(on) {
+      $('doneActions').classList.toggle('hidden', !on)
+      $('doneActions').classList.toggle('flex', on)
+    }
+
+    function start(f) {
+      file = f
+      $('panelIdle').classList.add('hidden')
+      $('panelLive').classList.remove('hidden')
+      refreshTexts()
+      autoplay()
+    }
+
+    /* ---------- the sample file: drag it onto "Your device" ----------
+       Pointer events, so it works with mouse, pen and touch. A tap or
+       Enter/Space on the button runs the demo too. */
+    function initSample() {
+      const el = $('sampleFile')
+      let sx = 0, sy = 0, dragging = false, moved = false
+      const overZone = e => {
+        const r = wrap.querySelector('.zone-rect').getBoundingClientRect()
+        return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom
+      }
+      const settle = () => { el.style.setProperty('--dx', '0px'); el.style.setProperty('--dy', '0px') }
+      el.addEventListener('pointerdown', e => {
+        if (!stage.classList.contains('idle')) return
+        el.setPointerCapture(e.pointerId)
+        sx = e.clientX; sy = e.clientY; dragging = true; moved = false
+        el.classList.add('is-dragging')
+      })
+      el.addEventListener('pointermove', e => {
+        if (!dragging) return
+        const dx = e.clientX - sx, dy = e.clientY - sy
+        if (Math.abs(dx) + Math.abs(dy) > 5) moved = true
+        el.style.setProperty('--dx', `${dx}px`); el.style.setProperty('--dy', `${dy}px`)
+        stage.classList.toggle('dragging', overZone(e))
+      })
+      const end = (e, cancelled) => {
+        if (!dragging) return
+        dragging = false
+        el.classList.remove('is-dragging')
+        const hit = !cancelled && moved && overZone(e)
+        stage.classList.remove('dragging')
+        if (hit) { start(SAMPLE); setTimeout(settle, 400) }
+        else settle()          // springs back to where it was
+      }
+      el.addEventListener('pointerup', e => end(e, false))
+      el.addEventListener('pointercancel', e => end(e, true))
+      el.addEventListener('click', () => { if (!moved && stage.classList.contains('idle')) start(SAMPLE) })
+    }
+
+    $('trySample').addEventListener('click', () => start(SAMPLE))
+    $('replay').addEventListener('click', autoplay)
+
+    // Files dragged in from the visitor's own computer are never read.
+    // The browser is stopped from opening them, and the stage says why.
+    window.addEventListener('dragover', e => e.preventDefault())
+    window.addEventListener('drop', e => {
+      e.preventDefault()
+      if (!stage.contains(e.target) || !stage.classList.contains('idle')) return
+      const note = $('idleNote'), original = note.textContent
+      note.textContent = 'This demo only uses the sample file. Nothing from your device was read.'
+      note.classList.add('text-slate-300')
+      setTimeout(() => { note.textContent = original; note.classList.remove('text-slate-300') }, 4500)
+    })
+
+    new ResizeObserver(pickLayout).observe(stage)
+    pickLayout()
+    setTimeout(() => stage.classList.add('ready'), 200)   // lets the guide line draw itself in
+
+    /* =========================================================
+       Section dividers and roadmap: the same line, drawn on view
+       ========================================================= */
+    const io = new IntersectionObserver(entries => entries.forEach(e => {
+      if (!e.isIntersecting) return
+      e.target.classList.add(e.target.id === 'roadmapWrap' ? 'rail-on' : 'on'); io.unobserve(e.target)
+    }), { threshold: .4 })
+    document.querySelectorAll('.hair, #roadmapWrap').forEach(el => io.observe(el))
+
+    /* =========================================================
+       Terminal: the real CLI output (cli/src/swarm-*.js), looped
+       ========================================================= */
+    const panes = { r: $('termRecv'), s: $('termSend') }
+    const CODE = CODE_PUBLIC + CODE_SECRET
+    const dim = s => `<span class="text-slate-500">${esc(s)}</span>`
+    const hi = s => `<span class="text-accent-soft">${esc(s)}</span>`
+    const SCRIPT = [
+      { p: 'r', cmd: 'ad-hal-receive --new ~/Downloads' },
+      { p: 'r', out: dim('[swarm-receive] joining topic (refresh=4000ms)'), wait: 350 },
+      { p: 'r', out: dim('[swarm-receive] note: not anonymous: your IP address is visible to the peer'), wait: 250 },
+      { p: 'r', out: '[swarm-receive] announced, waiting for a peer...', wait: 600 },
+      { p: 'r', out: `  scan the code above, or type:  ${hi(CODE)}`, wait: 700 },
+      { p: 's', cmd: 'ad-hal-send - ./report.pdf' },
+      { p: 's', type: CODE, prefix: dim('code: ') },
+      { p: 's', out: dim('[swarm-send] joining topic (refresh=4000ms)'), wait: 350 },
+      { p: 's', out: `[swarm-send] connected to ${hi('3f9a1c07b2e4...')}`, wait: 600 },
+      { p: 'r', out: `[swarm-receive] connection from ${hi('7b21de9f04ac...')}`, wait: 300 },
+      { p: 'r', out: `  offer: report.pdf · 24.8 MB · sha256 ${dim('9c1e…a07f')}`, wait: 300 },
+      { p: 'r', type: 'y', prefix: 'accept this file? [y/N] ', speed: 160 },
+      { progress: 1900 },
+      { p: 's', out: '[swarm-send] done: report.pdf', wait: 120 },
+      { p: 'r', out: '[swarm-receive] done: report.pdf', wait: 160 },
+      { p: 'r', out: hi("✓ verified: the file matches the sender's manifest digest"), wait: 200 },
+      { p: 's', out: hi('✓ verified: the receiver confirmed all 26004211 bytes'), wait: 0 },
+    ]
+    let termRun = 0
+    const tsleep = ms => new Promise(r => setTimeout(r, reduceMotion ? 0 : ms))
+    const line = (p, html) => { const d = document.createElement('div'); d.className = 'whitespace-pre-wrap break-words'; d.innerHTML = html; panes[p].appendChild(d); return d }
+    const caret = p => { document.querySelectorAll('.term-body .caret').forEach(c => c.remove()); if (p && panes[p].lastElementChild) panes[p].lastElementChild.insertAdjacentHTML('beforeend', '<span class="caret"></span>') }
+    async function typeLine(p, prefix, text, speed, id) {
+      const el = line(p, prefix), span = document.createElement('span'); span.className = 'text-white'; el.appendChild(span); caret(p)
+      for (const ch of text) { if (id !== termRun) return false; span.textContent += ch; el.appendChild(el.querySelector('.caret')); await tsleep(speed + Math.random() * speed * .6) }
+      return true
+    }
+    async function bars(ms, id) {
+      const b = ['r', 's'].map(p => line(p, '<div class="flex items-center gap-3 py-1"><div class="bar flex-1"><i></i></div><span class="w-10 text-right text-[11px] text-slate-500">0%</span></div>'))
+      caret(null)
+      const start = performance.now()
+      while (true) {
+        if (id !== termRun) return false
+        const t = reduceMotion ? 1 : Math.min(1, (performance.now() - start) / ms), e = 1 - Math.pow(1 - t, 2)
+        b.forEach(el => { el.querySelector('i').style.width = `${e * 100}%`; el.querySelector('span:last-child').textContent = `${Math.round(e * 100)}%` })
+        if (t >= 1) return true
+        await new Promise(r => setTimeout(r, 30))
+      }
+    }
+    async function runTerm() {
+      const id = ++termRun; panes.r.innerHTML = ''; panes.s.innerHTML = ''
+      for (const s of SCRIPT) {
+        if (id !== termRun) return
+        if (s.cmd) { if (!(await typeLine(s.p, '<span class="text-accent">$</span> ', s.cmd, 28, id))) return; await tsleep(320) }
+        else if (s.type) { if (!(await typeLine(s.p, s.prefix, s.type, s.speed || 34, id))) return; await tsleep(260) }
+        else if (s.progress) { if (!(await bars(s.progress, id))) return }
+        else { line(s.p, s.out); caret(s.p); await tsleep(s.wait ?? 250) }
+      }
+      caret('r')
+    }
+    const REPLAY_GAP_MS = 5000
+    async function loopTerm() { while (true) { await runTerm(); if (reduceMotion) return; await new Promise(r => setTimeout(r, REPLAY_GAP_MS)) } }
+    const termIO = new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) { loopTerm(); termIO.disconnect() } }, { threshold: .3 })
+    termIO.observe(panes.r)
+  })()
+  </script>
+</body>
+</html>
