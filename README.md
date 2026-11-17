@@ -19,19 +19,20 @@ Lucide icons and Geist fonts load from CDNs; everything else is inline in
 
 ## What's on the page
 
-- **Make the connection (hero):** an interactive demo. Visitors drag the sample
+- **Your file goes straight to their machine (hero):** an interactive demo. Visitors drag the sample
   file onto "Your device", or press "Try a sample transfer", and watch a drop
   play through five stages: Pair, Find, Seal, Transfer, Verify. Each stage can
   be selected to explain what really happens and who can see what. The demo
   only ever uses the built-in sample file; it never asks for, reads or sends a
   visitor's own files.
-- **Send a file:** in the nav, under the demo, after each run and at the
-  bottom of the page. There is no browser client, so it opens a dialog with
+- **Send a file:** in the nav, after each demo run and at the bottom of the
+  page. There is no browser client, so it opens a dialog with
   the real CLI commands.
-- **Today, it's two commands:** a terminal replay of a real CLI drop, looping
-  with a 5-second pause.
-- **The shift:** Direct, Sealed, Unbound.
-- **Under the hood:** a spec list. The dotted terms (HyperDHT, Hyperswarm,
+- **Send a file in two commands:** a terminal replay of a real CLI drop,
+  looping with a 5-second pause, plus links to the published test trials and
+  the quickstart.
+- **No upload, no expiring link:** Direct, Sealed, Unmetered.
+- **The protocol, in six lines:** a spec list. The dotted terms (HyperDHT, Hyperswarm,
   NAT, CPace PAKE, ChaCha20-Poly1305, SHA-256) open a short definition dialog.
 - **Roadmap** and **footer** (© 2026 Nebarti, LLC).
 
@@ -110,7 +111,7 @@ All of these live in `index.html`.
   `cli/src/swarm-receive.js` and `swarm-send.js`, so update them when the
   CLI's output changes. `REPLAY_GAP_MS` sets the pause between replays.
 - **Send dialog:** `#sendDialog` holds the CLI commands.
-- **Roadmap:** one `<article>` per phase in `#roadmap`. Phase 2 has dashed
-  placeholders for future download buttons.
+- **Roadmap:** one `<article>` per phase in `#roadmap`. Phase 2 has an HTML
+  comment marking where app download buttons go once the apps ship.
 - **Search and AI discovery:** the JSON-LD block in `<head>`, `llms.txt` and
   `robots.txt`. Keep them in step with the page when facts change.
